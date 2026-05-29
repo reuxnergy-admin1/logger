@@ -1,0 +1,119 @@
+(kicad_sch
+	(version 20260306)
+	(generator "eeschema")
+	(generator_version "10.0")
+	(uuid "48928449-df53-4984-a087-5b1043d034d3")
+	(paper "A4")
+	(title_block
+		(title "Valve Drivers")
+		(date "")
+		(rev "0.1")
+		(company "")
+		(comment 1 "V1 = latching pulse valve via DRV8871 H-bridge")
+		(comment 2 "V2,V3 = non-latching valves via ULN2803A")
+		(comment 3 "Add components per docs/REVIEW_AND_VALVE_DRIVER.md")
+	)
+	(lib_symbols
+	)
+	(hierarchical_label "12VOUT"
+		(shape input)
+		(at 50.8 50.8 180)
+		(fields_autoplaced yes)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify right)
+		)
+		(uuid "cb451a6c-8193-4ef4-b45d-2c427085e476")
+	)
+	(hierarchical_label "GND"
+		(shape input)
+		(at 50.8 55.88 180)
+		(fields_autoplaced yes)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify right)
+		)
+		(uuid "657b48bd-c965-449f-89f3-f2ae00e5e52e")
+	)
+	(hierarchical_label "V1_IN1"
+		(shape input)
+		(at 50.8 66.04 180)
+		(fields_autoplaced yes)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify right)
+		)
+		(uuid "81a67ce2-b2c6-4f85-acf7-f162620fa979")
+	)
+	(hierarchical_label "V1_IN2"
+		(shape input)
+		(at 50.8 71.12 180)
+		(fields_autoplaced yes)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify right)
+		)
+		(uuid "ea1debb1-453b-4188-8cf0-f2bdf7a0ef30")
+	)
+	(hierarchical_label "V2_EN"
+		(shape input)
+		(at 50.8 76.2 180)
+		(fields_autoplaced yes)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify right)
+		)
+		(uuid "7272373e-a70e-4760-9e0a-1bf8efea8dab")
+	)
+	(hierarchical_label "V3_EN"
+		(shape input)
+		(at 50.8 81.28 180)
+		(fields_autoplaced yes)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify right)
+		)
+		(uuid "548a4832-325f-44f8-b7d6-fb49c135809c")
+	)
+	(hierarchical_label "V_PWR_EN"
+		(shape input)
+		(at 50.8 86.36 180)
+		(fields_autoplaced yes)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify right)
+		)
+		(uuid "bc05dab9-9ead-47c7-8d7c-4e826e62d366")
+	)
+	(text "Valve Driver Sub-sheet — populate per docs/REVIEW_AND_VALVE_DRIVER.md\\n\\nDRV8871DDA (U_VLV1) for V1 latching/pulse valve\\nULN2803A (U_VLV2) for V2/V3 non-latching valves\\nOptional P-FET high-side gate on 12VOUT (Q_VLV1/Q_VLV2)\\n6-pos Phoenix terminal block J_VLV: V1+, V1-, V2, GND, V3, GND"
+		(exclude_from_sim no)
+		(at 100 60 0)
+		(effects
+			(font
+				(size 1.5 1.5)
+			)
+			(justify left)
+		)
+		(uuid "b52ba804-dfda-43a7-99e9-579412e77ace")
+	)
+	(sheet_instances
+		(path "/"
+			(page "2")
+		)
+	)
+	(embedded_fonts no)
+)
