@@ -179,10 +179,12 @@ Optional master power gate (recommended — kills 12 V when valves not in use):
 
 | TQFP-44 pin | AVR | Hierarchical label | Function |
 |---|---|---|---|
-| 37 | PA5 | `V1_IN1` | DRV8871 IN1 — pulse OPEN |
-| 38 | PA4 | `V1_IN2` | DRV8871 IN2 — pulse CLOSE |
-| 36 | PA6 | `V2_EN` | ULN2803 IN1 — non-latching V2 ON/OFF |
-| 35 | PA7 | `V3_EN` | ULN2803 IN2 — non-latching V3 ON/OFF |
+| 32 | PA5 | `V1_IN1` | DRV8871 IN1 — pulse OPEN |
+| 33 | PA4 | `V1_IN2` | DRV8871 IN2 — pulse CLOSE |
+| 31 | PA6 | `V2_EN` | ULN2803 IN1 — non-latching V2 ON/OFF |
+| 30 | PA7 | `V3_EN` | ULN2803 IN2 — non-latching V3 ON/OFF |
+
+> **Note:** TQFP-44 pin numbers for Port A are 30–37 (PA7=30 … PA0=37). The DIP-40 equivalents are PA4=36, PA5=35, PA6=34, PA7=33.
 | (any free) | e.g., PB1 | `V_PWR_EN` | optional master 12 V gate |
 
 ### 2.4 Component sizing rationale
@@ -259,3 +261,63 @@ In KiCad 9:
 4. Add valve driver sub-sheet from §2 if your application needs valve actuation.
 5. Apply §1.6–1.10 hardening before production run.
 6. Run final ERC + DRC.
+
+
+---
+
+## 5. Programming headers for the ATmega1284P-A
+
+The board currently has **no AVR programming header** (J7 is SWD for the LSM100A). Add the following.
+
+### 5.1 AVR ISP / ICSP — 6-pin (required)
+
+Standard Atmel AVR-ISP-6 (2×3, 2.54 mm). Used to burn the bootloader and/or flash directly.
+
+```
+        ┌─────────────┐
+ MISO  1│ ●  ●        │2  VCC (3V3)
+  SCK  3│ ●  ●        │4  MOSI
+  RST  5│ ●  ●        │6  GND
+        └─────────────┘
+```
+
+| Hdr pin | Signal | Port | TQFP-44 pin | Net | Description |
+|---|---|---|---|---|---|
+| 1 | MISO | PB6 | 2 | `MISO` | target → programmer |
+| 2 | VCC | — | — | `3V3` | power/sense (3.3 V) |
+| 3 | SCK | PB7 | 3 | `SCK` | ISP clock |
+| 4 | MOSI | PB5 | 1 | `MOSI` | programmer → target |
+| 5 | RESET | RESET | 4 | `RST` | low during programming |
+| 6 | GND | — | — | `GND` | ground |
+
+- Taps the existing microSD SPI bus (MOSI/MISO/SCK) + RESET. SD CS stays high during ISP → no conflict.
+- Symbol `Connector:AVR-ISP-6`; footprint `Connector_PinHeader_2.54mm:PinHeader_2x03_P2.54mm_Vertical`.
+- Tight-space option: Tag-Connect **TC2030-IDC-NL** (no connector).
+- **Requires:** 10 kΩ pull-up on RESET to 3V3, and 100 nF on each VCC/AVCC (AVCC via ferrite/10 µH + 100 nF).
+
+### 5.2 Arduino serial / FTDI — 6-pin (optional, after bootloader)
+
+SparkFun "FTDI Basic" order. Uses USART0 (PD0/PD1).
+
+```
+ [GND][CTS][VCC][TXO][RXI][DTR]
+   1    2    3    4    5    6
+```
+
+| Hdr pin | Silk | To AVR | Port | TQFP-44 pin | Net | Description |
+|---|---|---|---|---|---|---|
+| 1 | GND | GND | — | — | `GND` | ground |
+| 2 | CTS | GND/NC | — | — | — | tie to GND |
+| 3 | VCC | 3V3 | — | — | `3V3` | use a **3.3 V** FTDI cable |
+| 4 | TXO | RXD0 | PD0 | 9 | `UART_RX` | FTDI → MCU RX |
+| 5 | RXI | TXD0 | PD1 | 10 | `UART_TX` | MCU TX → FTDI |
+| 6 | DTR | RESET via 100 nF | RESET | 4 | `RST` | auto-reset into bootloader |
+
+- Auto-reset needs a **100 nF** series cap between DTR and RESET (plus the 10 kΩ RESET pull-up).
+
+### 5.3 Toolchain / fuses (3.3 V)
+
+- At 3.3 V, max clock is 10 MHz → run the external crystal at **8 MHz**.
+- Arduino IDE: **MightyCore → ATmega1284 → External 8 MHz**, then **Burn Bootloader** once via ISP.
+- Direct flash (USBasp): `avrdude -c usbasp -p m1284p -U flash:w:firmware.hex:i`
+- After fuses select the external crystal, the chip needs Y1 present to start.
