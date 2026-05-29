@@ -321,3 +321,66 @@ SparkFun "FTDI Basic" order. Uses USART0 (PD0/PD1).
 - Arduino IDE: **MightyCore → ATmega1284 → External 8 MHz**, then **Burn Bootloader** once via ISP.
 - Direct flash (USBasp): `avrdude -c usbasp -p m1284p -U flash:w:firmware.hex:i`
 - After fuses select the external crystal, the chip needs Y1 present to start.
+
+
+---
+
+## 6. Tipping-bucket rain-gauge pulse input (PB2)
+
+The `PULSE` header net should route to **PB2** (TQFP-44 pin 42), which is both **INT2** (hardware interrupt) and **PCINT10** (pin-change, wakes from Power-down). A tipping bucket is a reed switch that briefly shorts `PULSE`→`GND` on each tip; the design challenge is contact-bounce rejection.
+
+### 6.1 Recommended circuit (RC + Schmitt + TVS)
+
+```
+            3V3
+             │
+            R1 10k          C2 100nF
+             │               │
+   PULSE  ●──┬──[R2 10k]──┬──┴── U_PC 74LVC1G17 (Schmitt, non-inv) ──● PB2
+             │            │
+          reed sw       C1 1uF
+          (gauge)         │
+             │           GND
+   GND    ●──┴───────────────────────────────────────────────────── GND
+
+   D_PC TVS (PESD3V3L1BA) across PULSE–GND; optional 100R / 600R ferrite at terminal
+```
+
+- Idle: reed open → node high → PB2 high. Tip: reed closed → node low → **falling edge** on PB2.
+- τ = R2·C1 = **10 ms** debounce (reed bounce <1 ms; real tips are seconds apart even in extreme rain, so no risk of merging tips).
+- 74LVC1G17 hysteresis guarantees a single clean edge from the slow RC ramp (critical when the MCU sleeps and isn't polling).
+
+### 6.2 BOM
+
+| Ref | Value | Footprint | Purpose |
+|---|---|---|---|
+| R1 | 10 kΩ | R_0603 | pull-up |
+| R2 | 10 kΩ | R_0603 | RC series |
+| C1 | 1 µF | C_0805 | RC cap (10 ms) |
+| C2 | 100 nF | C_0603 | Schmitt decouple |
+| U_PC | 74LVC1G17 | SOT-23-5 | non-inverting Schmitt buffer |
+| D_PC | PESD3V3L1BA | SOD-523 | ESD/surge TVS |
+| FB1 (opt) | 600 Ω ferrite | 0603 | EMI |
+
+Budget variant: omit U_PC/C2, tie RC node to PB2, use internal pull-up + software debounce.
+
+### 6.3 Firmware (register-level)
+
+```c
+volatile uint32_t tip_count = 0;
+void pulse_init(void) {
+    DDRB  &= ~(1<<PB2);     // input
+    PORTB |=  (1<<PB2);     // internal pull-up
+    EICRA |=  (1<<ISC21);   // INT2 falling edge
+    EICRA &= ~(1<<ISC20);
+    EIMSK |=  (1<<INT2);
+    sei();
+}
+ISR(INT2_vect) { tip_count++; }
+```
+
+### 6.4 Sleep gotcha
+
+Edge-triggered INT2 does **not** wake the ATmega1284P from Power-down (I/O clock stopped). To wake on a tip, either:
+- use **PCINT10 on PB2** (`PCICR|=(1<<PCIE1); PCMSK1|=(1<<PCINT10);`, count in `ISR(PCINT1_vect)`) — wakes on any edge, or
+- use **INT2 low-level mode** (`ISC2=00`) — wakes from Power-down while line held low.
