@@ -384,3 +384,40 @@ ISR(INT2_vect) { tip_count++; }
 Edge-triggered INT2 does **not** wake the ATmega1284P from Power-down (I/O clock stopped). To wake on a tip, either:
 - use **PCINT10 on PB2** (`PCICR|=(1<<PCIE1); PCMSK1|=(1<<PCINT10);`, count in `ISR(PCINT1_vect)`) — wakes on any edge, or
 - use **INT2 low-level mode** (`ISC2=00`) — wakes from Power-down while line held low.
+
+
+---
+
+## 7. SDI-12 interface review (U3 / Q1 / D1) — issues found
+
+Traced net-by-net from the schematic. Topology as drawn:
+
+```
+ UART_TX ──► U3.2 (A in)            U3 = SN74LVC1G240 (inverting, 3-state buffer)
+ DIR_OUT ──► U3.1 (/OE)             U3.5 VCC ──► VIN   (!!)
+               U3.4 (Y) ──┬── Q1.gate (BSS123)
+                          └── R2 510R ──┬── R3 510R ──► SDI-12 line
+                                        └── D1 (BZX84C7V5, 7.5V) ──► GND
+ RX: Q1 drain ──► UART_RX ; Q1 source ──► GND ; R1 47k: +3V3 ──► UART_RX (pull-up)
+```
+
+Logic polarity is correct (LVC inverts TX, BSS123 inverts RX — both match SDI-12's inverted convention). The problems are power rail, logic levels, and a missing control connection.
+
+### Findings
+
+1. **CRITICAL — U3 VCC tied to `VIN`.** SN74LVC1G240 max VCC = 5.5 V (6.5 V abs). If VIN is an unregulated battery/solar/12 V input, the buffer is over-volted and destroyed. Must come from a regulated rail.
+2. **CRITICAL — logic-family/level mismatch.** SDI-12 "spacing" requires the line driven to 3.5–5.5 V, so the buffer must run at 5 V. But SN74**LVC**1G240 at 5 V needs VIH ≈ 3.5 V; the 3.3 V MCU output won't reliably read as high. At 3.3 V VCC the output (3.3 V) is below the 3.5 V SDI-12 minimum. → Replace with **SN74AHCT1G240** (TTL inputs, VIH = 2.0 V at 5 V) — accepts 3.3 V logic and outputs proper 5 V levels. Same SOT-23-5 footprint.
+3. **CRITICAL — `DIR_OUT` (/OE) not connected to the MCU.** The net appears only once (at U3 pin 1). With /OE floating the transceiver direction is undefined. Assign a free MCU GPIO to drive `DIR_OUT`.
+4. **IMPORTANT — D1 = 7.5 V Zener too high.** SDI-12 line max 5.5 V; buffer I/O abs-max ~6.5 V. Use **BZX84C5V6 (5.6 V)** or a proper TVS (**SMAJ5.0A** / **PESD5V0S1BA**) for field-cable surge.
+5. **IMPORTANT — 5 V rail may not exist.** `5V`/`5VOUT` nets appear only once each (undistributed). Likely why U3 was tied to VIN. Establish a regulated 5 V source (5 V regulator from VIN) to power the SDI-12 interface.
+6. **MINOR — RX sense taps the driver-side node** (Q1 gate at U3.Y), so TX loops back onto `UART_RX`. Functional; MCU should ignore RX during TX.
+
+### Corrected interface
+
+| Item | As drawn | Change to |
+|---|---|---|
+| U3 part | SN74LVC1G240 | SN74AHCT1G240 (TTL inputs) |
+| U3 VCC | VIN | regulated 5 V |
+| DIR_OUT (/OE) | unconnected | drive from MCU GPIO |
+| D1 clamp | 7.5 V Zener | 5.6 V Zener or 5 V TVS |
+| 5 V rail | single-label/unclear | establish a real 5 V rail |
